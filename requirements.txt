@@ -1,3 +1,4 @@
-python-telegram-bot==20.5
+python-telegram-bot==20.3
 aiohttp==3.8.4
 nltk==3.8.1
+cython==0.29.36
