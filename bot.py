@@ -5,9 +5,10 @@ import aiohttp
 import nltk
 from nltk.corpus import words
 from datetime import datetime, timedelta
+import asyncio
 
-# Your Telegram bot token
-BOT_TOKEN = "7787236358:AAFPS1Z_AcBNnI-GIP9CP9lJ-9p_CAG5I10"
+# Telegram bot token
+BOT_TOKEN = "7787236358:AAEiDQNthIY6GWZyfkc8qbW-Cw-uDJUwtOo"
 
 # Owner ID
 OWNER_ID = 7640331919
@@ -22,26 +23,20 @@ WORD_LIST = words.words()
 # Generate short meaningful words (5-12 characters)
 SHORT_WORD_LIST = [word for word in WORD_LIST if 5 <= len(word) <= 12 and word.isalpha()]
 
-# Generate meaningful and unique variations
-def generate_meaningful_variations(base_word: str) -> list:
-    prefixes = ["Eco", "Bright", "Dream", "Green", "Happy", "Blue", "Smart"]
-    suffixes = ["Land", "Zone", "Nest", "Haven", "Path", "Mind", "Way"]
-    meaningful_variations = [
-        f"{prefix}{base_word}" for prefix in prefixes
-    ] + [
-        f"{base_word}{suffix}" for suffix in suffixes
-    ]
-    meaningful_variations.append(base_word)  # Include the base word
-    return list(set(meaningful_variations))  # Ensure uniqueness
+# Prefixes and suffixes for username generation
+PREFIXES = [
+    "Eco", "Bright", "Dream", "Green", "Happy", "Blue", "Smart", "Alpha", "Beta", "Neo",
+    "Aero", "Quantum", "Hyper", "Astro", "Golden", "Silver", "Next", "Power", "Mega",
+    "Ultra", "Vision", "Prime", "Future", "Dynamic", "Magic", "Fast", "Strong", "Clear",
+    "Pure", "Active", "Royal", "Epic", "True", "Vital", "Max", "Star", "Nova", "Core"
+]
 
-# Check username availability using Telegram's API
-async def check_username(username: str) -> bool:
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/getChat"
-    payload = {"chat_id": f"@{username}"}
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=payload) as response:
-            data = await response.json()
-            return not data.get("ok", False) and "not found" in data.get("description", "").lower()
+SUFFIXES = [
+    "Land", "Zone", "Nest", "Haven", "Path", "Mind", "Way", "Stream", "Flow", "Base",
+    "Edge", "Point", "Sky", "World", "Verse", "Vibes", "Place", "Life", "Hub", "Cloud",
+    "Force", "Track", "Trail", "Port", "Peak", "Bridge", "Realm", "Shore", "Field",
+    "Light", "Spark", "Rise", "Pulse", "Scope", "Focus", "Shift", "Glow", "Sphere", "Link"
+]
 
 # Helper: Parse duration strings (e.g., "1D", "1H")
 def parse_duration(duration_str: str) -> timedelta:
@@ -80,6 +75,25 @@ async def ensure_approved(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"Error sending DM to {user_id}: {e}")
     return False
 
+# Helper: Check username availability using Telegram's API
+async def check_username(username: str) -> bool:
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/getChat"
+    payload = {"chat_id": f"@{username}"}
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload) as response:
+            data = await response.json()
+            return not data.get("ok", False) and "not found" in data.get("description", "").lower()
+
+# Helper: Generate meaningful variations with prefixes and suffixes
+async def check_and_add_variations(word, available_usernames, session):
+    variations = [f"{prefix}{word}" for prefix in PREFIXES] + [f"{word}{suffix}" for suffix in SUFFIXES]
+    random.shuffle(variations)  # Shuffle for variety
+
+    for variation in variations[:10]:  # Limit to 10 variations per word
+        username = variation.lower()
+        if await check_username(username):
+            available_usernames.add(f"@{variation}")
+
 # Command: Approve users
 async def approve_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
@@ -104,77 +118,7 @@ async def approve_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Invalid user ID. Please provide a numeric user ID.")
 
-# Command: Generate meaningful and unique usernames
-async def generate_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_approved(update, context):
-        return
-
-    count = 10
-    if context.args:
-        try:
-            count = min(20, max(1, int(context.args[0])))
-        except ValueError:
-            await update.message.reply_text("Please provide a valid number of usernames to generate (1-20).")
-            return
-
-    await update.message.reply_text(f"Generating {count} meaningful usernames...")
-
-    random_words = random.sample(SHORT_WORD_LIST, count)
-    available_usernames = set()
-
-    for word in random_words:
-        for variation in generate_meaningful_variations(word):
-            if await check_username(variation.lower()):
-                available_usernames.add(f"@{variation}")
-                if len(available_usernames) >= count:
-                    break
-        if len(available_usernames) >= count:
-            break
-
-    response = (
-        "Meaningful and available usernames:\n" + "\n".join(available_usernames)
-        if available_usernames
-        else "Could not find any available usernames. Please try again."
-    )
-    await update.message.reply_text(response)
-
-# Command: Create usernames based on a given word
-async def create_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_approved(update, context):
-        return
-
-    if not context.args or len(context.args) != 1:
-        await update.message.reply_text("Usage: /create <base_word>")
-        return
-
-    base_word = context.args[0].strip()
-    
-    # Validate the base word
-    if len(base_word) < 5 or len(base_word) > 12 or not base_word.isalpha():
-        await update.message.reply_text("Invalid base word. It must be 5-12 alphabetic characters.")
-        return
-
-    await update.message.reply_text(f"Generating usernames similar to '{base_word}'...")
-
-    additional_words = random.sample(SHORT_WORD_LIST, 10)
-    variations = [f"{base_word}{word}" for word in additional_words]
-
-    available_usernames = set()
-
-    for variation in variations:
-        if await check_username(variation.lower()):
-            available_usernames.add(f"@{variation}")
-            if len(available_usernames) >= 10:
-                break
-
-    response = (
-        "Generated usernames similar to your input:\n" + "\n".join(available_usernames)
-        if available_usernames
-        else "Could not find any available usernames. Please try again."
-    )
-    await update.message.reply_text(response)
-
-# Command: Make multi-word usernames
+# Command: Make usernames
 async def make_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_approved(update, context):
         return
@@ -183,26 +127,51 @@ async def make_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args:
         try:
             word_count = int(context.args[0])
-            if word_count not in [5, 6, 8]:
+            if word_count not in [5, 6, 7, 8]:
                 raise ValueError
         except ValueError:
-            await update.message.reply_text("Please provide a valid word count (5, 6, or 8).")
+            await update.message.reply_text("Please provide a valid word count (5, 6, 7, or 8).")
             return
 
-    await update.message.reply_text(f"Generating {word_count}-word usernames...")
+    await update.message.reply_text(f"Generating {word_count}-word meaningful and available usernames...")
 
     available_usernames = set()
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for _ in range(50):  # Try up to 50 combinations
+            words = random.sample(SHORT_WORD_LIST, word_count)
+            username = "".join(words).lower()
+            if len(username) <= 32:
+                tasks.append(check_username(username))
 
-    for _ in range(20):  # Try up to 20 combinations
-        words = random.sample(SHORT_WORD_LIST, word_count)
-        username = "".join(words)
-        if len(username) <= 32 and await check_username(username.lower()):
-            available_usernames.add(f"@{username}")
-            if len(available_usernames) >= 10:
-                break
+        results = await asyncio.gather(*tasks)
+        for i, result in enumerate(results):
+            if result:
+                available_usernames.add(f"@{username}")
 
     response = (
-        "Generated multi-word usernames:\n" + "\n".join(available_usernames)
+        "Generated meaningful and available usernames:\n" + "\n".join(available_usernames)
+        if available_usernames
+        else "Could not find any available usernames. Please try again."
+    )
+    await update.message.reply_text(response)
+
+# Command: Generate 20-30 usernames
+async def generate_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await ensure_approved(update, context):
+        return
+
+    await update.message.reply_text("Generating 20-30 meaningful usernames and checking availability...")
+
+    available_usernames = set()
+    random_words = random.sample(SHORT_WORD_LIST, 20)
+
+    async with aiohttp.ClientSession() as session:
+        tasks = [check_and_add_variations(word, available_usernames, session) for word in random_words]
+        await asyncio.gather(*tasks)
+
+    response = (
+        "Generated meaningful and available usernames:\n" + "\n".join(available_usernames)
         if available_usernames
         else "Could not find any available usernames. Please try again."
     )
@@ -213,10 +182,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Welcome to the Username Generator Bot!\n\n"
         "Commands:\n"
-        "/generate - Generate meaningful Telegram usernames.\n"
-        "/create - Generate usernames based on a base word.\n"
-        "/make - Generate 5-word, 6-word, or 8-word usernames.\n"
-        "/check - Check the availability of usernames.\n"
+        "/make <word_count> - Generate 5, 6, 7, or 8-word meaningful usernames.\n"
+        "/generate - Generate 20-30 meaningful usernames automatically.\n"
         "/approve - Owner-only command to approve users.\n"
         "/help - Get instructions."
     )
@@ -224,8 +191,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Command: Help
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Use /generate, /create, or /make to generate usernames. Use /check to validate them. "
-        "Only approved users can use this bot. Contact the owner for access."
+        "Use /make to generate meaningful usernames with a specified word count (5-8). "
+        "Use /generate to automatically create 20-30 meaningful usernames and check availability."
     )
 
 # Main function to run the bot
@@ -234,9 +201,8 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("approve", approve_user))
-    application.add_handler(CommandHandler("generate", generate_usernames))
-    application.add_handler(CommandHandler("create", create_usernames))
     application.add_handler(CommandHandler("make", make_usernames))
+    application.add_handler(CommandHandler("generate", generate_usernames))
     application.run_polling()
 
 if __name__ == "__main__":
