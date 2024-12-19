@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import asyncio
 
 # Telegram bot token
-BOT_TOKEN = "7512114938:AAF5dzFAjvTInD7D74-m4eSvp1WfWakGWvY"
+BOT_TOKEN = "7388530009:AAHOgu6S-ISp5W-H5-V1JMhxH1wgoZB2DEk"
 
 # Owner ID
 OWNER_ID = 7640331919
