@@ -7,7 +7,7 @@ from nltk.corpus import words
 from datetime import datetime, timedelta
 
 # Your Telegram bot token
-BOT_TOKEN = "7787236358:AAGj4h4jDh9XCL-Sm-E9MsEFAqi_Kn9Dsdo"
+BOT_TOKEN = "7787236358:AAFPS1Z_AcBNnI-GIP9CP9lJ-9p_CAG5I10"
 
 # Owner ID
 OWNER_ID = 7640331919
