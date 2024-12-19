@@ -8,13 +8,13 @@ from datetime import datetime, timedelta
 import asyncio
 
 # Telegram bot token
-BOT_TOKEN = "7388530009:AAHOgu6S-ISp5W-H5-V1JMhxH1wgoZB2DEk"
+BOT_TOKEN = "7388530009:AAFOAdHsYrcWEF2ZOZ7TOIUnU-E_U0CLBCE"
 
 # Owner ID
 OWNER_ID = 7640331919
 
-# In-memory storage for approvals
-approved_users = {}
+# In-memory storage for approved users
+approved_users = set()
 
 # Ensure the NLTK word list is downloaded
 nltk.download("words")
@@ -60,6 +60,23 @@ async def check_and_add_variations(word, available_usernames, session):
         if await check_username(username):
             available_usernames.add(f"@{variation}")
 
+# Command: Approve a user by user ID
+async def approve_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        await update.message.reply_text("You are not authorized to use this command.")
+        return
+
+    if not context.args or len(context.args) != 1:
+        await update.message.reply_text("Usage: /approve <user_id>")
+        return
+
+    try:
+        user_id = int(context.args[0])
+        approved_users.add(user_id)
+        await update.message.reply_text(f"User {user_id} has been approved.")
+    except ValueError:
+        await update.message.reply_text("Invalid user ID. Please provide a numeric user ID.")
+
 # Command: Generate 100 usernames
 async def generate_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -89,13 +106,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Welcome to the Username Generator Bot!\n\n"
         "Commands:\n"
         "/generate - Generate 100 meaningful usernames automatically.\n"
+        "/approve - Approve a user by user ID (Owner only).\n"
         "/help - Get instructions."
     )
 
 # Command: Help
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Use /generate to automatically create 100 meaningful usernames and check availability."
+        "Use /generate to automatically create 100 meaningful usernames and check availability.\n"
+        "Only approved users can use this bot. Contact the owner for access."
     )
 
 # Main function to run the bot
@@ -103,6 +122,7 @@ def main():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("approve", approve_user))
     application.add_handler(CommandHandler("generate", generate_usernames))
     application.run_polling()
 
