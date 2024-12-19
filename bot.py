@@ -7,7 +7,7 @@ from nltk.corpus import words
 from datetime import datetime, timedelta
 
 # Your Telegram bot token
-BOT_TOKEN = "7787236358:AAHERPbXt8dGsxg8GcP9VVOmFPCrkn16X6Y"
+BOT_TOKEN = "7787236358:AAGj4h4jDh9XCL-Sm-E9MsEFAqi_Kn9Dsdo"
 
 # Owner ID
 OWNER_ID = 7640331919
@@ -74,7 +74,7 @@ async def ensure_approved(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_message(
             chat_id=user_id,
-            text="You are not approved to use this bot. Please contact @UnderThief to request access."
+            text="You are not approved to use this bot. Please contact @YourTelegramUsername to request access."
         )
     except Exception as e:
         print(f"Error sending DM to {user_id}: {e}")
@@ -131,41 +131,91 @@ async def generate_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if len(available_usernames) >= count:
             break
 
-    if available_usernames:
-        response = "Meaningful and available usernames:\n" + "\n".join(available_usernames)
-    else:
-        response = "Could not find any available usernames. Please try again."
+    response = (
+        "Meaningful and available usernames:\n" + "\n".join(available_usernames)
+        if available_usernames
+        else "Could not find any available usernames. Please try again."
+    )
     await update.message.reply_text(response)
 
-# Command: Check usernames in bulk
-async def check_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Command: Create usernames based on a given word
+async def create_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_approved(update, context):
         return
 
-    if not context.args:
-        await update.message.reply_text("Please provide usernames to check.")
+    if not context.args or len(context.args) != 1:
+        await update.message.reply_text("Usage: /create <base_word>")
         return
 
-    usernames = [username.strip("@").strip() for username in " ".join(context.args).split()]
-    results = []
-    for username in usernames:
-        if len(username) < 5 or len(username) > 32 or not username.isalnum():
-            results.append(f"@{username} - Invalid username.")
-            continue
+    base_word = context.args[0].strip()
+    
+    # Validate the base word
+    if len(base_word) < 5 or len(base_word) > 12 or not base_word.isalpha():
+        await update.message.reply_text("Invalid base word. It must be 5-12 alphabetic characters.")
+        return
 
-        if await check_username(username):
-            results.append(f"@{username} - Available ✅")
-        else:
-            results.append(f"@{username} - Unavailable ❌")
+    await update.message.reply_text(f"Generating usernames similar to '{base_word}'...")
 
-    await update.message.reply_text("\n".join(results))
+    additional_words = random.sample(SHORT_WORD_LIST, 10)
+    variations = [f"{base_word}{word}" for word in additional_words]
+
+    available_usernames = set()
+
+    for variation in variations:
+        if await check_username(variation.lower()):
+            available_usernames.add(f"@{variation}")
+            if len(available_usernames) >= 10:
+                break
+
+    response = (
+        "Generated usernames similar to your input:\n" + "\n".join(available_usernames)
+        if available_usernames
+        else "Could not find any available usernames. Please try again."
+    )
+    await update.message.reply_text(response)
+
+# Command: Make multi-word usernames
+async def make_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await ensure_approved(update, context):
+        return
+
+    word_count = 5  # Default word count
+    if context.args:
+        try:
+            word_count = int(context.args[0])
+            if word_count not in [5, 6, 8]:
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("Please provide a valid word count (5, 6, or 8).")
+            return
+
+    await update.message.reply_text(f"Generating {word_count}-word usernames...")
+
+    available_usernames = set()
+
+    for _ in range(20):  # Try up to 20 combinations
+        words = random.sample(SHORT_WORD_LIST, word_count)
+        username = "".join(words)
+        if len(username) <= 32 and await check_username(username.lower()):
+            available_usernames.add(f"@{username}")
+            if len(available_usernames) >= 10:
+                break
+
+    response = (
+        "Generated multi-word usernames:\n" + "\n".join(available_usernames)
+        if available_usernames
+        else "Could not find any available usernames. Please try again."
+    )
+    await update.message.reply_text(response)
 
 # Command: Start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Welcome to the Meaningful Username Generator Bot!\n\n"
+        "Welcome to the Username Generator Bot!\n\n"
         "Commands:\n"
-        "/generate - Generate meaningful and unique Telegram usernames.\n"
+        "/generate - Generate meaningful Telegram usernames.\n"
+        "/create - Generate usernames based on a base word.\n"
+        "/make - Generate 5-word, 6-word, or 8-word usernames.\n"
         "/check - Check the availability of usernames.\n"
         "/approve - Owner-only command to approve users.\n"
         "/help - Get instructions."
@@ -174,8 +224,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Command: Help
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Use /generate to generate meaningful usernames or /check to check availability. "
-        "Only approved users can use this bot. Contact @UnderThief to request approval."
+        "Use /generate, /create, or /make to generate usernames. Use /check to validate them. "
+        "Only approved users can use this bot. Contact the owner for access."
     )
 
 # Main function to run the bot
@@ -185,7 +235,8 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("approve", approve_user))
     application.add_handler(CommandHandler("generate", generate_usernames))
-    application.add_handler(CommandHandler("check", check_usernames))
+    application.add_handler(CommandHandler("create", create_usernames))
+    application.add_handler(CommandHandler("make", make_usernames))
     application.run_polling()
 
 if __name__ == "__main__":
