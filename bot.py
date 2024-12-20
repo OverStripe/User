@@ -5,7 +5,7 @@ import aiohttp
 import asyncio
 
 # Telegram bot token
-BOT_TOKEN = "7388530009:AAF2P_-bFssTjnIKT1O-MjFLS2q4QPFnJTY"
+BOT_TOKEN = "7388530009:AAEzpe7mSSd5mKYVq6hFkoR7yMX-2vuaU_0"
 
 # Owner ID
 OWNER_ID = 7640331919
@@ -13,19 +13,19 @@ OWNER_ID = 7640331919
 # In-memory storage for approved users
 approved_users = set()
 
-# Vast list of Hindi words
-HINDI_WORDS = [
-    # Emotions and Traits
-    "Prem", "Daya", "Shaanti", "Anand", "Veerta", "Satya", "Gyaan", "Bhakti", "Vishwas", "Sammaan",
-    # Nature and Elements
-    "Chand", "Suraj", "Vayu", "Jal", "Prithvi", "Aakash", "Agni", "Hawa", "Barish", "Ganga",
-    # Mythology
-    "Ram", "Krishna", "Hanuman", "Sita", "Durga", "Lakshmi", "Ganesh", "Vishnu", "Shiva", "Parvati", 
-    "Kali", "Saraswati", "Indra", "Karan", "Arjun", "Bheem", "Ravan",
-    # Professions and Roles
-    "Guru", "Raja", "Rani", "Yodha", "Sipahi", "Kavi", "Kalakar", "Vidyarthi", "Netaji",
-    # Miscellaneous
-    "Swarg", "Mukti", "Jeevan", "Adarsh", "Aatma", "Bhavishya", "Samarpan", "Vijay"
+# Words, prefixes, suffixes, and anime names for username generation
+PREFIXES = ["Super", "Mega", "Ultra", "Hyper", "Elite", "Cool", "Swift", "Star", "Power", "Shadow", "Neo", "Alpha"]
+SUFFIXES = ["Master", "Pro", "Hero", "King", "Queen", "Ace", "Boss", "Ninja", "Sensei", "Samurai"]
+ADJECTIVES = ["Happy", "Brave", "Smart", "Bold", "Clever", "Mighty", "Bright", "Fierce", "Epic", "Glorious"]
+NOUNS = ["Tiger", "Eagle", "Phoenix", "Lion", "Falcon", "Wolf", "Shark", "Panther", "Dragon", "Blade"]
+
+# Anime-related terms and names
+ANIME_NAMES = [
+    "Naruto", "Sasuke", "Sakura", "Kakashi", "Itachi", "Goku", "Vegeta", "Luffy", "Zoro", "Nami", 
+    "Mikasa", "Eren", "Levi", "Armin", "Killua", "Gon", "Hisoka", "Astro", "Inuyasha", "Haku", 
+    "Jiraiya", "Rengoku", "Tanjirou", "Nezuko", "Zenitsu", "Gojo", "Satoru", "Yuji", "Kaguya", "Shiro", 
+    "ZeroTwo", "Kaneki", "Ichigo", "Rukia", "Aizen", "Shoto", "Deku", "Bakugo", "Erza", "Natsu", 
+    "Gray", "Lucy", "Meliodas", "Elizabeth", "Ban", "Escanor", "Shinobu", "Sanemi", "Tomioka", "Rukia"
 ]
 
 # Helper: Check username availability using Telegram's API
@@ -54,35 +54,48 @@ async def approve_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Invalid user ID. Please provide a numeric user ID.")
 
-# Command: Generate usernames with Hindi words
-async def generate1(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Command: Generate usernames
+async def generate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != OWNER_ID and user_id not in approved_users:
         await update.message.reply_text("You are not approved to use this bot. Contact the bot owner for access.")
         return
 
-    await update.message.reply_text("Generating 100 Hindi-based usernames and checking availability...")
+    # Set max length (default: 20 characters)
+    max_length = 20
+    if context.args:
+        try:
+            max_length = int(context.args[0])
+            if max_length < 5 or max_length > 30:
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("Invalid length. Please provide a number between 5 and 30.")
+            return
+
+    await update.message.reply_text(f"Generating usernames with a maximum length of {max_length} characters...")
 
     available_usernames = set()
-    random_words = random.sample(HINDI_WORDS, len(HINDI_WORDS))  # Use all Hindi words for diversity
-
     async with aiohttp.ClientSession() as session:
         tasks = []
-        for word in random_words:
-            username = word.lower()
+        for _ in range(300):  # Generate a larger pool for better results
+            # Combine components dynamically
+            username = random.choice(PREFIXES) + random.choice(ADJECTIVES) + random.choice(NOUNS + ANIME_NAMES)
+            if len(username) > max_length:
+                continue
+            username = username[:max_length].lower()  # Ensure length constraint
             tasks.append(check_username(username))
             if len(available_usernames) >= 100:
                 break
 
         results = await asyncio.gather(*tasks)
-        for word, available in zip(random_words, results):
+        for task, available in zip(tasks, results):
             if available:
-                available_usernames.add(f"@{word}")
+                available_usernames.add(f"@{task}")
                 if len(available_usernames) >= 100:
                     break
 
     response = (
-        "Generated meaningful and available Hindi usernames:\n" + "\n".join(available_usernames)
+        "Generated meaningful and available usernames:\n" + "\n".join(available_usernames)
         if available_usernames
         else "Could not find any available usernames. Please try again."
     )
@@ -91,9 +104,9 @@ async def generate1(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Command: Start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Welcome to the Username Generator Bot!\n\n"
+        "Welcome to the Anime Username Generator Bot!\n\n"
         "Commands:\n"
-        "/generate1 - Generate 100 Hindi-based usernames automatically.\n"
+        "/generate <max_length> - Generate 100 cool usernames (default max length: 20).\n"
         "/approve - Approve a user by user ID (Owner only).\n"
         "/help - Get instructions."
     )
@@ -101,7 +114,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Command: Help
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Use /generate1 to automatically create 100 Hindi-based usernames. "
+        "Use /generate <max_length> to create 100 cool usernames. "
+        "You can specify a maximum length for the usernames (default: 20). "
         "Only approved users can use this bot. Contact the owner for access."
     )
 
@@ -111,7 +125,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("approve", approve_user))
-    application.add_handler(CommandHandler("generate1", generate1))
+    application.add_handler(CommandHandler("generate", generate))
     application.run_polling()
 
 if __name__ == "__main__":
