@@ -5,7 +5,7 @@ import aiohttp
 import asyncio
 
 # Telegram bot token
-BOT_TOKEN = "7388530009:AAEzpe7mSSd5mKYVq6hFkoR7yMX-2vuaU_0"
+BOT_TOKEN = "7388530009:AAHcVTFhxujN8ZJ2-sOwVq5dmR6aMlLtI1A"
 
 # Owner ID
 OWNER_ID = 7640331919
@@ -13,23 +13,21 @@ OWNER_ID = 7640331919
 # In-memory storage for approved users
 approved_users = set()
 
-# Words, prefixes, suffixes, and anime names for username generation
-PREFIXES = ["Super", "Mega", "Ultra", "Hyper", "Elite", "Cool", "Swift", "Star", "Power", "Shadow", "Neo", "Alpha"]
-SUFFIXES = ["Master", "Pro", "Hero", "King", "Queen", "Ace", "Boss", "Ninja", "Sensei", "Samurai"]
-ADJECTIVES = ["Happy", "Brave", "Smart", "Bold", "Clever", "Mighty", "Bright", "Fierce", "Epic", "Glorious"]
-NOUNS = ["Tiger", "Eagle", "Phoenix", "Lion", "Falcon", "Wolf", "Shark", "Panther", "Dragon", "Blade"]
-
-# Anime-related terms and names
-ANIME_NAMES = [
-    "Naruto", "Sasuke", "Sakura", "Kakashi", "Itachi", "Goku", "Vegeta", "Luffy", "Zoro", "Nami", 
-    "Mikasa", "Eren", "Levi", "Armin", "Killua", "Gon", "Hisoka", "Astro", "Inuyasha", "Haku", 
-    "Jiraiya", "Rengoku", "Tanjirou", "Nezuko", "Zenitsu", "Gojo", "Satoru", "Yuji", "Kaguya", "Shiro", 
-    "ZeroTwo", "Kaneki", "Ichigo", "Rukia", "Aizen", "Shoto", "Deku", "Bakugo", "Erza", "Natsu", 
-    "Gray", "Lucy", "Meliodas", "Elizabeth", "Ban", "Escanor", "Shinobu", "Sanemi", "Tomioka", "Rukia"
+# Vast word list for stylish, trendy usernames
+WORD_LIST = [
+    "revamped", "reborn", "arcane", "stellar", "eclipse", "phantom", "shadow", "mythic", "ethereal",
+    "luminous", "celestial", "spectral", "crimson", "vortex", "radiant", "zephyr", "infinite", "nova",
+    "valiant", "glacial", "seraphic", "aether", "nebula", "void", "elegant", "primal", "lucid", "sublime",
+    "aqua", "onyx", "ember", "halo", "blaze", "dusk", "dawn", "flare", "frost", "mist", "rift", "pulse",
+    "zenith", "aspire", "flux", "spirit", "zen", "wisp", "glyph", "echo", "orbit", "quartz", "ignite",
+    "solace", "rift", "haven", "arcadia", "soar", "catalyst", "fusion", "arc", "haven", "nova", "flare",
+    "shade", "spark", "vivid", "stride", "bound", "clarity", "titan", "bliss", "novae", "prime", "aura",
+    "cypher", "horizon", "pulse", "stellar", "epoch", "zen", "vibe", "spire", "odyssey", "luxe"
 ]
 
 # Helper: Check username availability using Telegram's API
 async def check_username(username: str) -> bool:
+    """Checks if a username is available on Telegram."""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/getChat"
     payload = {"chat_id": f"@{username}"}
     async with aiohttp.ClientSession() as session:
@@ -39,6 +37,7 @@ async def check_username(username: str) -> bool:
 
 # Command: Approve a user by user ID
 async def approve_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Approve a user to use the bot (Owner only)."""
     if update.effective_user.id != OWNER_ID:
         await update.message.reply_text("You are not authorized to use this command.")
         return
@@ -54,73 +53,53 @@ async def approve_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Invalid user ID. Please provide a numeric user ID.")
 
-# Command: Generate usernames
+# Command: Generate a username
 async def generate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Generate usernames and keep trying until a valid one is found."""
     user_id = update.effective_user.id
     if user_id != OWNER_ID and user_id not in approved_users:
         await update.message.reply_text("You are not approved to use this bot. Contact the bot owner for access.")
         return
 
-    # Set max length (default: 20 characters)
-    max_length = 20
-    if context.args:
-        try:
-            max_length = int(context.args[0])
-            if max_length < 5 or max_length > 30:
-                raise ValueError
-        except ValueError:
-            await update.message.reply_text("Invalid length. Please provide a number between 5 and 30.")
-            return
+    await update.message.reply_text("Generating usernames. This may take a moment...")
 
-    await update.message.reply_text(f"Generating usernames with a maximum length of {max_length} characters...")
-
-    available_usernames = set()
     async with aiohttp.ClientSession() as session:
-        tasks = []
-        for _ in range(300):  # Generate a larger pool for better results
-            # Combine components dynamically
-            username = random.choice(PREFIXES) + random.choice(ADJECTIVES) + random.choice(NOUNS + ANIME_NAMES)
-            if len(username) > max_length:
+        while True:  # Keep trying until a valid username is found
+            username = random.choice(WORD_LIST).lower()
+            if len(username) < 5 or len(username) > 15:  # Ensure Telegram constraints
                 continue
-            username = username[:max_length].lower()  # Ensure length constraint
-            tasks.append(check_username(username))
-            if len(available_usernames) >= 100:
-                break
 
-        results = await asyncio.gather(*tasks)
-        for task, available in zip(tasks, results):
-            if available:
-                available_usernames.add(f"@{task}")
-                if len(available_usernames) >= 100:
-                    break
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/getChat"
+            payload = {"chat_id": f"@{username}"}
 
-    response = (
-        "Generated meaningful and available usernames:\n" + "\n".join(available_usernames)
-        if available_usernames
-        else "Could not find any available usernames. Please try again."
-    )
-    await update.message.reply_text(response)
+            async with session.post(url, json=payload) as response:
+                data = await response.json()
+                if not data.get("ok", False) and "not found" in data.get("description", "").lower():
+                    await update.message.reply_text(f"Found available username: @{username}")
+                    return  # Exit loop once a valid username is found
 
 # Command: Start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Send a welcome message and list available commands."""
     await update.message.reply_text(
-        "Welcome to the Anime Username Generator Bot!\n\n"
+        "Welcome to the Username Finder Bot!\n\n"
         "Commands:\n"
-        "/generate <max_length> - Generate 100 cool usernames (default max length: 20).\n"
+        "/generate - Generate a single available username.\n"
         "/approve - Approve a user by user ID (Owner only).\n"
         "/help - Get instructions."
     )
 
 # Command: Help
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Send a help message explaining how to use the bot."""
     await update.message.reply_text(
-        "Use /generate <max_length> to create 100 cool usernames. "
-        "You can specify a maximum length for the usernames (default: 20). "
+        "Use /generate to create an available username. "
         "Only approved users can use this bot. Contact the owner for access."
     )
 
 # Main function to run the bot
 def main():
+    """Run the bot."""
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
