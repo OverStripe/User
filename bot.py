@@ -7,7 +7,7 @@ from telegram.ext import (
 )
 
 # ✅ Bot Configuration
-BOT_TOKEN = "7371066438:AAHQPNv8X0CzZaWI1CqPdeFhkg7QUUY1Qso"
+BOT_TOKEN = "7371066438:AAHfRSjYW0Zj5bOi-tM8qO-PDuNs9cOPC-s"
 OWNER_ID = 7222795580  # Replace with your Telegram user ID
 
 # ✅ In-Memory Storage
