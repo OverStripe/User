@@ -1,155 +1,74 @@
-import random
-import aiohttp
-import asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import requests
+from telegram import Update
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+    CallbackContext,
 )
 
-# ✅ Bot Configuration
-BOT_TOKEN = "7371066438:AAHfRSjYW0Zj5bOi-tM8qO-PDuNs9cOPC-s"
-OWNER_ID = 7222795580  # Replace with your Telegram user ID
+# Telegram Bot Token
+TOKEN = '7617781212:AAEv2T8xETBqh04wiCsle1ubCG136CnXDaE'
 
-# ✅ In-Memory Storage
-approved_users = set()
-checked_usernames = set()
+# API Endpoints for Username Availability
+TELEGRAM_API_URL = "https://t.me/"
+FRAGMENT_API_URL = "https://fragment.com/username/"
 
-# ✅ Enhanced Word List for Usernames
-WORD_LIST = [
-    # 🌌 Mystical & Fantasy
-    "arcane", "ethereal", "phantom", "mythic", "seraphic", "celestial", "spectral", "aether", "void",
-    "eclipse", "nebula", "zephyr", "luminous", "radiant", "aurora", "obsidian", "shadow", "onyx", "spirit",
-    "crimson", "ember", "rift", "zenith", "glimmer", "oracle", "whisper",
-
-    # 🚀 Tech & Sci-Fi
-    "cypher", "nova", "quartz", "synthetic", "binary", "hologram", "quantum", "flux", "nexus", "fusion",
-    "spark", "glitch", "ether", "horizon", "matrix", "circuit", "byte", "pulse", "logic", "signal", "data",
-
-    # 🌿 Nature & Elements
-    "ocean", "forest", "blossom", "raven", "willow", "dawn", "dusk", "flame", "ice", "frost", "storm",
-    "rain", "breeze", "river", "thunder", "lotus", "fern", "ash", "gale", "serenity", "cascade", "glacier",
-
-    # 💎 Elegant & Stylish
-    "prime", "elite", "luxe", "royal", "noble", "vivid", "clarity", "zen", "sublime", "halo", "aura",
-    "stride", "catalyst", "odyssey", "haven", "arcadia", "elegance", "lucid", "gleam", "solace", "velvet",
-
-    # 🎮 Gaming & Modern
-    "sniper", "blaze", "fury", "omen", "phantasm", "vortex", "arc", "drift", "smoke", "flare", "venom",
-    "razor", "stealth", "strike", "rogue", "blade", "prowler", "zero", "nightshade", "firefly", "reboot"
-]
-
-# ============================
-# ✅ Helper Function: Check Username
-# ============================
-
-async def check_username(username: str) -> bool:
-    """Check if a username is available on Telegram."""
-    if username in checked_usernames:
-        return False
-
-    checked_usernames.add(username)
-    telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getChat"
-    payload = {"chat_id": f"@{username}"}
-
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(telegram_url, json=payload) as response:
-                data = await response.json()
-                return not data.get("ok", False) and "not found" in data.get("description", "").lower()
-    except Exception as e:
-        print(f"Error checking username {username}: {e}")
-        return False
-
-# ============================
-# ✅ Commands
-# ============================
-
-# ✅ /start Command
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Welcome Message"""
+# Start Command
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "👋 **Welcome to the Enhanced Username Finder Bot!**\n\n"
-        "Commands:\n"
-        "• `/generate` - Generate a random available username.\n"
-        "• `/generate @username` - Check if a specific username is available.\n"
-        "• `/generate_bulk` - Generate and check 1,000 usernames.\n"
-        "• `/approve <user_id>` - Approve a user (Owner only).\n"
-        "• `/help` - Get help instructions.\n\n"
-        "Enjoy finding the perfect username!"
+        "✅ **Welcome to the Username Checker Bot!**\n\n"
+        "🔹 To check usernames, use:\n`/check username1 username2 username3`\n"
+        "🔹 To stop the bot, use:\n`/stop`"
     )
 
-# ✅ /help Command
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Help Command"""
-    await update.message.reply_text(
-        "🛠 **How to Use:**\n"
-        "1️⃣ `/generate` - Generate a random available username.\n"
-        "2️⃣ `/generate @username` - Check if a specific username is available.\n"
-        "3️⃣ `/generate_bulk` - Generate and check 1,000 usernames.\n"
-        "4️⃣ Click '🔄 Generate Another Username' to search again.\n\n"
-        "⚠️ Only approved users can generate usernames. Contact the owner for access."
-    )
-
-# ✅ /approve Command
-async def approve_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Approve a user"""
-    if update.effective_user.id != OWNER_ID:
-        await update.message.reply_text("❌ You are not authorized to use this command.")
+# Check Usernames Command
+async def check_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not context.args:
+        await update.message.reply_text(
+            "⚠️ Please provide a list of usernames separated by spaces.\n"
+            "Example: `/check ecaru ecar0 ecarv`"
+        )
         return
 
-    if not context.args or len(context.args) != 1:
-        await update.message.reply_text("Usage: /approve <user_id>")
-        return
+    usernames = [username.strip() for username in context.args]
+    response_text = ""
 
-    try:
-        user_id = int(context.args[0])
-        approved_users.add(user_id)
-        await update.message.reply_text(f"✅ User {user_id} has been approved.")
-    except ValueError:
-        await update.message.reply_text("⚠️ Invalid user ID. Please provide a numeric user ID.")
+    for username in usernames:
+        try:
+            # Check on Telegram
+            tg_response = requests.get(f"{TELEGRAM_API_URL}{username}")
+            telegram_status = "✅ Available" if tg_response.status_code == 404 else "❌ Taken"
 
-# ✅ /generate Command
-async def generate(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Generate or check a specific username's availability."""
-    user_id = update.effective_user.id
-    if user_id != OWNER_ID and user_id not in approved_users:
-        await update.message.reply_text("❌ You are not approved to use this bot.")
-        return
+            # Check on Fragment
+            frag_response = requests.get(f"{FRAGMENT_API_URL}{username}")
+            fragment_status = "✅ Available" if frag_response.status_code == 404 else "❌ Taken"
 
-    if context.args:
-        username = context.args[0].strip("@").lower()
-        if await check_username(username):
-            await update.message.reply_text(f"✅ Username @{username} is available!")
-        else:
-            await update.message.reply_text(f"❌ Username @{username} is taken.")
-    else:
-        for _ in range(5):
-            username = random.choice(WORD_LIST).lower()
-            if await check_username(username):
-                await update.message.reply_text(f"✅ Found available username: @{username}")
-                return
-        await update.message.reply_text("❌ No available usernames found in 5 attempts.")
+            response_text += f"🔹 **Username:** @{username}\n"
+            response_text += f"   🟢 Telegram: {telegram_status}\n"
+            response_text += f"   🟠 Fragment: {fragment_status}\n\n"
 
-# ✅ /generate_bulk Command
-async def generate_bulk(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Generate 1,000 usernames and check availability."""
-    available_usernames = []
-    for _ in range(1000):
-        username = random.choice(WORD_LIST).lower()
-        if await check_username(username):
-            available_usernames.append(username)
-    await update.message.reply_text(f"✅ Available Usernames:\n" + "\n".join(available_usernames))
+        except requests.RequestException as e:
+            response_text += f"⚠️ Error checking @{username}: {str(e)}\n\n"
 
-# ✅ Main Function
+    await update.message.reply_text(response_text if response_text else "No valid usernames provided.")
+
+# Stop Command
+async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text("👋 **Bot is shutting down. Goodbye!**")
+    await context.application.stop()
+    print("Bot stopped by user command.")
+
+# Main Function
 def main():
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("approve", approve_user))
-    application.add_handler(CommandHandler("generate", generate))
-    application.add_handler(CommandHandler("generate_bulk", generate_bulk))
-    application.run_polling()
+    app = ApplicationBuilder().token(TOKEN).build()
 
-# Run Bot
-if __name__ == "__main__":
+    app.add_handler(CommandHandler('start', start))
+    app.add_handler(CommandHandler('check', check_usernames))
+    app.add_handler(CommandHandler('stop', stop))
+
+    print("✅ Bot is running... Press Ctrl+C to stop.")
+    app.run_polling()
+
+if __name__ == '__main__':
     main()
